@@ -1,0 +1,401 @@
+CREATE TABLE university (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    website_url TEXT NOT NULL,
+    source_type TEXT NOT NULL
+);
+
+CREATE TABLE schedule_profile (
+    id TEXT NOT NULL PRIMARY KEY,
+    profile_type TEXT NOT NULL,
+    name TEXT NOT NULL,
+    source_url TEXT,
+    source_key TEXT,
+    university_id TEXT NOT NULL DEFAULT 'bru'
+);
+
+CREATE TABLE lesson (
+    id TEXT NOT NULL PRIMARY KEY,
+    profile_id TEXT NOT NULL,
+    lesson_date TEXT NOT NULL,
+    day_of_week INTEGER NOT NULL,
+    slot_number INTEGER NOT NULL,
+    subject_name TEXT NOT NULL,
+    teacher_name TEXT NOT NULL,
+    classroom TEXT NOT NULL,
+    start_time TEXT NOT NULL,
+    end_time TEXT NOT NULL,
+    lesson_type TEXT NOT NULL,
+    color_hex TEXT NOT NULL,
+    is_custom INTEGER NOT NULL,
+    version INTEGER NOT NULL,
+    source_key TEXT NOT NULL,
+    source_color_hex TEXT,
+    notes TEXT NOT NULL DEFAULT '',
+    rating INTEGER,
+    stickers TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX lesson_profile_date_time_idx ON lesson(profile_id, lesson_date, start_time);
+CREATE INDEX lesson_source_key_idx ON lesson(profile_id, source_key);
+
+CREATE TABLE academic_task (
+    id TEXT NOT NULL PRIMARY KEY,
+    lesson_id TEXT,
+    profile_id TEXT,
+    subject_name_snapshot TEXT NOT NULL,
+    task_title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    due_date INTEGER NOT NULL,
+    is_completed INTEGER NOT NULL,
+    link_type TEXT NOT NULL DEFAULT 'NONE',
+    reminder_mode TEXT NOT NULL DEFAULT 'INHERIT',
+    reminder_offsets_minutes TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX academic_task_due_date_idx ON academic_task(is_completed, due_date);
+CREATE INDEX academic_task_lesson_idx ON academic_task(lesson_id);
+
+CREATE TABLE schedule_snapshot (
+    id TEXT NOT NULL PRIMARY KEY,
+    profile_id TEXT NOT NULL,
+    captured_at_epoch_ms INTEGER NOT NULL
+);
+
+CREATE TABLE lesson_snapshot (
+    snapshot_id TEXT NOT NULL,
+    id TEXT NOT NULL,
+    profile_id TEXT NOT NULL,
+    lesson_date TEXT NOT NULL,
+    day_of_week INTEGER NOT NULL,
+    slot_number INTEGER NOT NULL,
+    subject_name TEXT NOT NULL,
+    teacher_name TEXT NOT NULL,
+    classroom TEXT NOT NULL,
+    start_time TEXT NOT NULL,
+    end_time TEXT NOT NULL,
+    lesson_type TEXT NOT NULL,
+    color_hex TEXT NOT NULL,
+    is_custom INTEGER NOT NULL,
+    version INTEGER NOT NULL,
+    source_key TEXT NOT NULL,
+    source_color_hex TEXT,
+    notes TEXT NOT NULL DEFAULT '',
+    rating INTEGER,
+    stickers TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (snapshot_id, id)
+);
+
+CREATE INDEX lesson_snapshot_id_idx ON lesson_snapshot(snapshot_id);
+
+CREATE TABLE profile_sync_state (
+    profile_id TEXT NOT NULL PRIMARY KEY,
+    last_attempt_epoch_ms INTEGER,
+    last_successful_epoch_ms INTEGER,
+    last_error TEXT,
+    previous_snapshot_id TEXT,
+    previous_snapshot_at_epoch_ms INTEGER
+);
+
+selectUniversities:
+SELECT
+    id AS id,
+    name AS name,
+    website_url AS websiteUrl,
+    source_type AS sourceType
+FROM university
+ORDER BY name COLLATE NOCASE;
+
+getUniversity:
+SELECT
+    id AS id,
+    name AS name,
+    website_url AS websiteUrl,
+    source_type AS sourceType
+FROM university
+WHERE id = ?;
+
+insertUniversity:
+INSERT OR IGNORE INTO university(id, name, website_url, source_type)
+VALUES (?, ?, ?, ?);
+
+updateUniversity:
+UPDATE university
+SET name = ?, website_url = ?, source_type = ?
+WHERE id = ?;
+
+selectProfiles:
+SELECT
+    id AS id,
+    profile_type AS profileType,
+    name AS name,
+    source_url AS sourceUrl,
+    source_key AS sourceKey,
+    university_id AS universityId
+FROM schedule_profile
+ORDER BY name COLLATE NOCASE;
+
+getProfile:
+SELECT
+    id AS id,
+    profile_type AS profileType,
+    name AS name,
+    source_url AS sourceUrl,
+    source_key AS sourceKey,
+    university_id AS universityId
+FROM schedule_profile
+WHERE id = ?;
+
+insertProfile:
+INSERT OR IGNORE INTO schedule_profile(id, profile_type, name, source_url, source_key, university_id)
+VALUES (?, ?, ?, ?, ?, ?);
+
+updateProfile:
+UPDATE schedule_profile
+SET profile_type = ?, name = ?, source_url = ?, source_key = ?, university_id = ?
+WHERE id = ?;
+
+deleteProfile:
+DELETE FROM schedule_profile WHERE id = ?;
+
+deleteLessonsForProfile:
+DELETE FROM lesson WHERE profile_id = ?;
+
+deleteTasksForProfile:
+DELETE FROM academic_task WHERE profile_id = ?;
+
+deleteSnapshotLessonsForProfile:
+DELETE FROM lesson_snapshot
+WHERE snapshot_id IN (SELECT id FROM schedule_snapshot WHERE profile_id = ?);
+
+deleteSnapshotsForProfile:
+DELETE FROM schedule_snapshot WHERE profile_id = ?;
+
+deleteSyncStateForProfile:
+DELETE FROM profile_sync_state WHERE profile_id = ?;
+
+selectAllLessons:
+SELECT
+    id AS id,
+    profile_id AS profileId,
+    lesson_date AS lessonDate,
+    day_of_week AS dayOfWeek,
+    slot_number AS slotNumber,
+    subject_name AS subjectName,
+    teacher_name AS teacherName,
+    classroom AS classroom,
+    start_time AS startTime,
+    end_time AS endTime,
+    lesson_type AS lessonType,
+    color_hex AS colorHex,
+    is_custom AS isCustom,
+    version AS version,
+    source_key AS sourceKey,
+    source_color_hex AS sourceColorHex,
+    notes AS notes,
+    rating AS rating,
+    stickers AS stickers
+FROM lesson
+ORDER BY lesson_date, start_time, slot_number;
+
+selectLessonsForProfile:
+SELECT
+    id AS id,
+    profile_id AS profileId,
+    lesson_date AS lessonDate,
+    day_of_week AS dayOfWeek,
+    slot_number AS slotNumber,
+    subject_name AS subjectName,
+    teacher_name AS teacherName,
+    classroom AS classroom,
+    start_time AS startTime,
+    end_time AS endTime,
+    lesson_type AS lessonType,
+    color_hex AS colorHex,
+    is_custom AS isCustom,
+    version AS version,
+    source_key AS sourceKey,
+    source_color_hex AS sourceColorHex,
+    notes AS notes,
+    rating AS rating,
+    stickers AS stickers
+FROM lesson
+WHERE profile_id = ?
+ORDER BY lesson_date, start_time, slot_number;
+
+getLesson:
+SELECT
+    id AS id,
+    profile_id AS profileId,
+    lesson_date AS lessonDate,
+    day_of_week AS dayOfWeek,
+    slot_number AS slotNumber,
+    subject_name AS subjectName,
+    teacher_name AS teacherName,
+    classroom AS classroom,
+    start_time AS startTime,
+    end_time AS endTime,
+    lesson_type AS lessonType,
+    color_hex AS colorHex,
+    is_custom AS isCustom,
+    version AS version,
+    source_key AS sourceKey,
+    source_color_hex AS sourceColorHex,
+    notes AS notes,
+    rating AS rating,
+    stickers AS stickers
+FROM lesson
+WHERE id = ?;
+
+insertLesson:
+INSERT OR IGNORE INTO lesson(
+    id, profile_id, lesson_date, day_of_week, slot_number, subject_name, teacher_name,
+    classroom, start_time, end_time, lesson_type, color_hex, is_custom, version, source_key,
+    source_color_hex, notes, rating, stickers
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+updateLesson:
+UPDATE lesson SET
+    profile_id = ?, lesson_date = ?, day_of_week = ?, slot_number = ?, subject_name = ?,
+    teacher_name = ?, classroom = ?, start_time = ?, end_time = ?, lesson_type = ?,
+    color_hex = ?, is_custom = ?, version = ?, source_key = ?, source_color_hex = ?, notes = ?,
+    rating = ?, stickers = ?
+WHERE id = ?;
+
+updateLessonNotes:
+UPDATE lesson SET notes = ? WHERE id = ?;
+
+updateLessonSnapshotNotes:
+UPDATE lesson_snapshot SET notes = ? WHERE id = ?;
+
+updateLessonRating:
+UPDATE lesson SET rating = ? WHERE id = ?;
+
+updateLessonSnapshotRating:
+UPDATE lesson_snapshot SET rating = ? WHERE id = ?;
+
+updateLessonStickers:
+UPDATE lesson SET stickers = ? WHERE id = ?;
+
+updateLessonSnapshotStickers:
+UPDATE lesson_snapshot SET stickers = ? WHERE id = ?;
+
+deleteLesson:
+DELETE FROM lesson WHERE id = ?;
+
+deleteLessonIfNoTasks:
+DELETE FROM lesson
+WHERE id = ? AND NOT EXISTS (SELECT 1 FROM academic_task WHERE lesson_id = ?);
+
+selectTasks:
+SELECT
+    id AS id,
+    lesson_id AS lessonId,
+    profile_id AS profileId,
+    subject_name_snapshot AS subjectNameSnapshot,
+    task_title AS taskTitle,
+    description AS description,
+    due_date AS dueDate,
+    is_completed AS isCompleted,
+    link_type AS linkType,
+    reminder_mode AS reminderMode,
+    reminder_offsets_minutes AS reminderOffsetsMinutes
+FROM academic_task
+ORDER BY due_date, task_title;
+
+selectTasksForLesson:
+SELECT
+    id AS id,
+    lesson_id AS lessonId,
+    profile_id AS profileId,
+    subject_name_snapshot AS subjectNameSnapshot,
+    task_title AS taskTitle,
+    description AS description,
+    due_date AS dueDate,
+    is_completed AS isCompleted,
+    link_type AS linkType,
+    reminder_mode AS reminderMode,
+    reminder_offsets_minutes AS reminderOffsetsMinutes
+FROM academic_task
+WHERE lesson_id = ?
+ORDER BY due_date, task_title;
+
+insertTask:
+INSERT OR IGNORE INTO academic_task(
+    id, lesson_id, profile_id, subject_name_snapshot, task_title, description, due_date, is_completed,
+    link_type, reminder_mode, reminder_offsets_minutes
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+updateTask:
+UPDATE academic_task SET
+    lesson_id = ?, profile_id = ?, subject_name_snapshot = ?, task_title = ?, description = ?,
+    due_date = ?, is_completed = ?, link_type = ?, reminder_mode = ?, reminder_offsets_minutes = ?
+WHERE id = ?;
+
+setTaskCompleted:
+UPDATE academic_task SET is_completed = ? WHERE id = ?;
+
+deleteTask:
+DELETE FROM academic_task WHERE id = ?;
+
+countTasksForLesson:
+SELECT COUNT(*) AS taskCount FROM academic_task WHERE lesson_id = ?;
+
+insertSnapshot:
+INSERT INTO schedule_snapshot(id, profile_id, captured_at_epoch_ms) VALUES (?, ?, ?);
+
+getSnapshot:
+SELECT id AS id, profile_id AS profileId, captured_at_epoch_ms AS capturedAtEpochMillis
+FROM schedule_snapshot WHERE id = ?;
+
+getSnapshotLessons:
+SELECT
+    id AS id,
+    profile_id AS profileId,
+    lesson_date AS lessonDate,
+    day_of_week AS dayOfWeek,
+    slot_number AS slotNumber,
+    subject_name AS subjectName,
+    teacher_name AS teacherName,
+    classroom AS classroom,
+    start_time AS startTime,
+    end_time AS endTime,
+    lesson_type AS lessonType,
+    color_hex AS colorHex,
+    is_custom AS isCustom,
+    version AS version,
+    source_key AS sourceKey,
+    source_color_hex AS sourceColorHex,
+    notes AS notes,
+    rating AS rating,
+    stickers AS stickers
+FROM lesson_snapshot
+WHERE snapshot_id = ?
+ORDER BY lesson_date, start_time, slot_number;
+
+insertSnapshotLesson:
+INSERT INTO lesson_snapshot(
+    snapshot_id, id, profile_id, lesson_date, day_of_week, slot_number, subject_name, teacher_name,
+    classroom, start_time, end_time, lesson_type, color_hex, is_custom, version, source_key, source_color_hex, notes, rating, stickers
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+getSyncState:
+SELECT
+    profile_id AS profileId,
+    last_attempt_epoch_ms AS lastAttemptAtEpochMillis,
+    last_successful_epoch_ms AS lastSuccessfulAtEpochMillis,
+    last_error AS lastError,
+    previous_snapshot_id AS previousSnapshotId,
+    previous_snapshot_at_epoch_ms AS previousSnapshotAtEpochMillis
+FROM profile_sync_state
+WHERE profile_id = ?;
+
+replaceSyncState:
+INSERT OR REPLACE INTO profile_sync_state(
+    profile_id, last_attempt_epoch_ms, last_successful_epoch_ms, last_error,
+    previous_snapshot_id, previous_snapshot_at_epoch_ms
+)
+VALUES (?, ?, ?, ?, ?, ?);

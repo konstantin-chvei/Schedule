@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="108" height="108" viewBox="0 0 108 108">
+  <title>Расписание — календарь</title>
+  <g stroke="#0A3DAD" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="27.5" y="28.5" width="53" height="53" rx="8" fill="#FFFFFF" />
+    <path d="M29 45.5h50" fill="none" />
+    <rect x="38" y="22.5" width="5" height="12" rx="2.5" fill="#0A3DAD" stroke="none" />
+    <rect x="65" y="22.5" width="5" height="12" rx="2.5" fill="#0A3DAD" stroke="none" />
+  </g>
+  <g fill="#0A3DAD">
+    <rect x="38" y="51" width="5" height="5" rx="1.2" />
+    <rect x="47" y="51" width="5" height="5" rx="1.2" />
+    <rect x="56" y="51" width="5" height="5" rx="1.2" />
+    <rect x="65" y="51" width="5" height="5" rx="1.2" />
+    <rect x="38" y="60" width="5" height="5" rx="1.2" />
+    <rect x="47" y="60" width="5" height="5" rx="1.2" fill="#12BBD8" />
+    <rect x="56" y="60" width="5" height="5" rx="1.2" />
+    <rect x="65" y="60" width="5" height="5" rx="1.2" />
+    <rect x="38" y="69" width="5" height="5" rx="1.2" />
+    <rect x="47" y="69" width="5" height="5" rx="1.2" />
+    <rect x="56" y="69" width="5" height="5" rx="1.2" />
+    <rect x="65" y="69" width="5" height="5" rx="1.2" />
+  </g>
+</svg>

@@ -1,0 +1,32 @@
+DROP INDEX academic_task_due_date_idx;
+DROP INDEX academic_task_lesson_idx;
+
+ALTER TABLE academic_task RENAME TO academic_task_v1;
+
+CREATE TABLE academic_task (
+    id TEXT NOT NULL PRIMARY KEY,
+    lesson_id TEXT,
+    profile_id TEXT,
+    subject_name_snapshot TEXT NOT NULL,
+    task_title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    due_date INTEGER NOT NULL,
+    is_completed INTEGER NOT NULL,
+    link_type TEXT NOT NULL DEFAULT 'NONE',
+    reminder_mode TEXT NOT NULL DEFAULT 'INHERIT',
+    reminder_offsets_minutes TEXT NOT NULL DEFAULT ''
+);
+
+INSERT INTO academic_task (
+    id, lesson_id, profile_id, subject_name_snapshot, task_title, description, due_date, is_completed,
+    link_type, reminder_mode, reminder_offsets_minutes
+)
+SELECT
+    id, lesson_id, profile_id, subject_name_snapshot, task_title, description, due_date, is_completed,
+    'SUBJECT', 'INHERIT', ''
+FROM academic_task_v1;
+
+DROP TABLE academic_task_v1;
+
+CREATE INDEX academic_task_due_date_idx ON academic_task(is_completed, due_date);
+CREATE INDEX academic_task_lesson_idx ON academic_task(lesson_id);

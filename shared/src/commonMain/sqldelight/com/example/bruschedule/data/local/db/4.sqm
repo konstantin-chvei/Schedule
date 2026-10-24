@@ -1,0 +1,4 @@
+ALTER TABLE lesson ADD COLUMN rating INTEGER;
+ALTER TABLE lesson ADD COLUMN stickers TEXT NOT NULL DEFAULT '';
+ALTER TABLE lesson_snapshot ADD COLUMN rating INTEGER;
+ALTER TABLE lesson_snapshot ADD COLUMN stickers TEXT NOT NULL DEFAULT '';

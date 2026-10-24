@@ -1,0 +1,217 @@
+name: Build test artifacts
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-apk:
+    name: Android debug APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Build installable debug APK
+        run: |
+          set -euo pipefail
+          LOG_PATH="$RUNNER_TEMP/android-build.log"
+          {
+            ANDROID_SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+            if [ -z "$ANDROID_SDK" ]; then
+              echo "ANDROID_HOME and ANDROID_SDK_ROOT are both unset"
+              exit 1
+            fi
+            echo "Using Android SDK at $ANDROID_SDK"
+            SDKMANAGER="$(find "$ANDROID_SDK"/cmdline-tools -type f -name sdkmanager -print -quit 2>/dev/null || true)"
+            if [ -d "$ANDROID_SDK/platforms/android-37" ]; then
+              echo "Building with Android API 37"
+              bash gradlew :androidApp:assembleDebug --no-daemon
+            elif [ -n "$SDKMANAGER" ]; then
+              echo "Trying to install Android API 37, including preview packages"
+              yes 2>/dev/null | "$SDKMANAGER" --sdk_root="$ANDROID_SDK" --licenses >/dev/null 2>&1 || true
+              if "$SDKMANAGER" --sdk_root="$ANDROID_SDK" --channel=3 --install "platforms;android-37"; then
+                bash gradlew :androidApp:assembleDebug --no-daemon
+              elif [ -d "$ANDROID_SDK/platforms/android-34" ]; then
+                echo "API 37 is unavailable; attempting a test-only API 34 build with AAR metadata validation skipped"
+                sed -i 's/^android-compileSdk = "37"$/android-compileSdk = "34"/; s/^android-targetSdk = "37"$/android-targetSdk = "34"/' gradle/libs.versions.toml
+                bash gradlew :androidApp:assembleDebug -x :androidApp:checkDebugAarMetadata --no-daemon
+              else
+                echo "Android API 37 could not be installed, and no fallback platform is available"
+                exit 1
+              fi
+            else
+              echo "sdkmanager was not found under $ANDROID_SDK/cmdline-tools"
+              exit 1
+            fi
+          } 2>&1 | tee "$LOG_PATH"
+
+      - name: Compile and test the importer with university-network access disabled
+        run: |
+          set -euo pipefail
+          bash gradlew :androidApp:testDebugUnitTest --tests com.example.bruschedule.tools.ScheduleDataImporterTest -x :androidApp:checkDebugAarMetadata --stacktrace --no-daemon 2>&1 | tee -a "$RUNNER_TEMP/android-build.log"
+
+      - name: Report Android build errors
+        if: failure()
+        env:
+          BUILD_LOG: ${{ runner.temp }}/android-build.log
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          log = Path(os.environ["BUILD_LOG"])
+          if not log.exists():
+              print("::error::Android build failed before a log file was created")
+          else:
+              lines = log.read_text(errors="replace").splitlines()
+              diagnostics = [i for i, line in enumerate(lines) if re.search(r"(^e:\s|error:|unresolved reference|unresolved[_ ]import|type mismatch|overload resolution|cannot access|kotlin compiler)", line, re.I)]
+              anchors = [i for i, line in enumerate(lines) if re.search(r"error:|failed|failure|exception|not found|could not|http [45][0-9][0-9]|aar metadata|compile.?sdk|minCompileSdk", line, re.I)]
+              selected_indices = {
+                  j for i in anchors[-15:] for j in range(max(0, i - 2), min(len(lines), i + 3))
+              }
+              selected_indices.update(
+                  j for i in diagnostics[-15:] for j in range(max(0, i - 2), min(len(lines), i + 3))
+              )
+              selected = [lines[i] for i in sorted(selected_indices)] if selected_indices else lines[-40:]
+              for line in selected[-90:]:
+                  escaped = line.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                  print(f"::error title=Android build log::{escaped}")
+          PY
+
+      - name: Upload Android build log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-android-build-log
+          path: |
+            ${{ runner.temp }}/android-build.log
+            androidApp/build/test-results/testDebugUnitTest/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: schedule-android-debug-apk
+          path: androidApp/build/outputs/apk/debug/androidApp-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+  ios-simulator:
+    name: iOS Simulator app
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Run shared tests and build iOS Simulator app
+        run: |
+          set -euo pipefail
+          {
+            bash gradlew :shared:iosSimulatorArm64Test --no-daemon
+            xcodebuild \
+              -project iosApp/iosApp.xcodeproj \
+              -scheme iosApp \
+              -configuration Debug \
+              -sdk iphonesimulator \
+              -destination 'generic/platform=iOS Simulator' \
+              -derivedDataPath "$RUNNER_TEMP/ScheduleDerivedData" \
+              ARCHS=arm64 \
+              CODE_SIGNING_ALLOWED=NO \
+              ENABLE_PREVIEWS=NO \
+              build
+          } 2>&1 | tee "$RUNNER_TEMP/ios-build.log"
+
+      - name: Report iOS build errors
+        if: failure()
+        env:
+          BUILD_LOG: ${{ runner.temp }}/ios-build.log
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          log = Path(os.environ["BUILD_LOG"])
+          if not log.exists():
+              print("::error::iOS build failed before a log file was created")
+          else:
+              lines = log.read_text(errors="replace").splitlines()
+              anchors = [
+                  index for index, line in enumerate(lines)
+                  if re.search(
+                      r"(^e:\s|error:|FAILURE:|BUILD FAILED|Execution failed|failed with an exception|Could not|Cannot|Unresolved reference|Type mismatch)",
+                      line,
+                      re.I,
+                  )
+              ]
+              selected_indices = sorted({
+                  adjacent
+                  for index in anchors[-12:]
+                  for adjacent in range(max(0, index - 1), min(len(lines), index + 2))
+              })
+              selected = [lines[index] for index in selected_indices] if selected_indices else lines[-20:]
+              for line in selected[-24:]:
+                  escaped = line[:900].replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                  print(f"::error title=iOS build log::{escaped}")
+
+          report_dir = Path("shared/build/test-results/iosSimulatorArm64Test")
+          for report in sorted(report_dir.glob("TEST-*.xml")):
+              try:
+                  root = ET.parse(report).getroot()
+              except ET.ParseError:
+                  continue
+              for case in root.iter("testcase"):
+                  for failure in list(case.findall("failure")) + list(case.findall("error")):
+                      name = f"{case.get('classname', '')}.{case.get('name', 'unknown')}".strip(".")
+                      detail = " ".join(part.strip() for part in (failure.get("message", ""), failure.text or "") if part.strip())[:1800]
+                      escaped = detail.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                      print(f"::error title=KMP test failure::{name}: {escaped}")
+          PY
+
+      - name: Upload iOS build log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-ios-build-log
+          path: ${{ runner.temp }}/ios-build.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Package Simulator app
+        run: >-
+          ditto -c -k --sequesterRsrc --keepParent
+          "$RUNNER_TEMP/ScheduleDerivedData/Build/Products/Debug-iphonesimulator/Schedule.app"
+          "$RUNNER_TEMP/schedule-ios-simulator.zip"
+
+      - name: Upload Simulator app
+        uses: actions/upload-artifact@v7
+        with:
+          name: schedule-ios-simulator-app
+          path: ${{ runner.temp }}/schedule-ios-simulator.zip
+          if-no-files-found: error
+          retention-days: 30

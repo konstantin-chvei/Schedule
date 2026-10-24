@@ -1,0 +1,8 @@
+CREATE TABLE university (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    website_url TEXT NOT NULL,
+    source_type TEXT NOT NULL
+);
+
+ALTER TABLE schedule_profile ADD COLUMN university_id TEXT NOT NULL DEFAULT 'bru';

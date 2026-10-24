@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "id": "bru",
+  "name": "Белорусско-Российский университет",
+  "website_url": "https://rasp.bru.by",
+  "generated_at": "2026-10-24T16:36:35.794434309Z",
+  "profiles": {"groups": 138, "teachers": 1}
+}

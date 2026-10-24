@@ -1,0 +1,27 @@
+{
+  "id": "./",
+  "name": "Schedule",
+  "short_name": "Schedule",
+  "description": "Расписание занятий, дедлайны и напоминания.",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F4F6FA",
+  "theme_color": "#F4F6FA",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-1024.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

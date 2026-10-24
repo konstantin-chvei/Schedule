@@ -1,0 +1,2 @@
+id,name,subtitle,source_url,source_key,schedule_path,local_file
+biology-group-41,41,Биологический факультет · дневное отделение · курс 1,https://bsu.bio/schedule.php?study=d&course=1&group=41&date=2026-10-23,bio-group-number:41,schedules/groups/biology-group-41.html,tools/schedules/imports/bsu/biology-41.html

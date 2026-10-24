@@ -1,0 +1,162 @@
+name: Import university schedule datasets
+
+on:
+  workflow_dispatch:
+    inputs:
+      university:
+        description: University datasets to refresh
+        type: choice
+        required: true
+        default: all
+        options:
+          - all
+          - bru
+          - bsu
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: schedule-data-import-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  import-and-publish:
+    name: Parse schedules and publish GitHub datasets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - name: Check out the selected branch
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Verify the import is running on a branch
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != refs/heads/* ]]; then
+            echo "Run this workflow from a branch; refusing to publish from $GITHUB_REF"
+            exit 1
+          fi
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Import current published schedules with the existing KMP parsers
+        env:
+          SCHEDULE_DATA_IMPORT: 'true'
+          SCHEDULE_DATA_UNIVERSITY: ${{ inputs.university || 'all' }}
+          SCHEDULE_REPOSITORY_ROOT: ${{ github.workspace }}
+          SCHEDULE_DATA_ROOT: ${{ github.workspace }}/schedule-data
+        run: |
+          set -euo pipefail
+          ANDROID_SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [ -z "$ANDROID_SDK" ]; then
+            echo "ANDROID_HOME and ANDROID_SDK_ROOT are both unset"
+            exit 1
+          fi
+          run_import() {
+            bash gradlew :androidApp:testDebugUnitTest --tests com.example.bruschedule.tools.ScheduleDataImporterTest --no-daemon
+          }
+          run_import_without_metadata_check() {
+            bash gradlew :androidApp:testDebugUnitTest --tests com.example.bruschedule.tools.ScheduleDataImporterTest -x :androidApp:checkDebugAarMetadata --no-daemon
+          }
+          if [ -d "$ANDROID_SDK/platforms/android-37" ]; then
+            run_import
+          else
+            SDKMANAGER="$(find "$ANDROID_SDK"/cmdline-tools -type f -name sdkmanager -print -quit 2>/dev/null || true)"
+            if [ -n "$SDKMANAGER" ]; then
+              yes 2>/dev/null | "$SDKMANAGER" --sdk_root="$ANDROID_SDK" --licenses >/dev/null 2>&1 || true
+              if "$SDKMANAGER" --sdk_root="$ANDROID_SDK" --channel=3 --install "platforms;android-37"; then
+                run_import
+              elif [ -d "$ANDROID_SDK/platforms/android-34" ]; then
+                sed -i 's/^android-compileSdk = "37"$/android-compileSdk = "34"/; s/^android-targetSdk = "37"$/android-targetSdk = "34"/' gradle/libs.versions.toml
+                run_import_without_metadata_check
+              else
+                echo "Android API 37 is unavailable, and no API 34 fallback is installed"
+                exit 1
+              fi
+            elif [ -d "$ANDROID_SDK/platforms/android-34" ]; then
+              sed -i 's/^android-compileSdk = "37"$/android-compileSdk = "34"/; s/^android-targetSdk = "37"$/android-targetSdk = "34"/' gradle/libs.versions.toml
+              run_import_without_metadata_check
+            else
+              echo "sdkmanager was not found, and no API 34 fallback is installed"
+              exit 1
+            fi
+          fi
+
+      - name: Validate schedule datasets
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tools/schedules/tests -v
+          python3 tools/schedules/validate_schedule_data.py
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("schedule-data/import-report.json").read_text(encoding="utf-8"))
+          print(
+              "Import summary: "
+              f"{report['discovered_profiles']} discovered, "
+              f"{report['imported_profiles']} imported, "
+              f"{report['preserved_profiles']} preserved, "
+              f"{report['skipped_profiles']} skipped"
+          )
+          PY
+
+      - name: Commit and publish updated datasets to the selected branch
+        run: |
+          set -euo pipefail
+          branch="${GITHUB_REF#refs/heads/}"
+          if [[ "$branch" == "$GITHUB_REF" || -z "$branch" ]]; then
+            echo "::error::Refusing to publish schedule data outside a branch: $GITHUB_REF"
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          imported_data="$RUNNER_TEMP/imported-schedule-data"
+          mkdir -p "$imported_data"
+          cp -a schedule-data/. "$imported_data/"
+
+          for attempt in 1 2 3; do
+            git fetch origin "refs/heads/${branch}:refs/remotes/origin/${branch}"
+            publish_dir="$RUNNER_TEMP/schedule-data-publish-${attempt}"
+            git worktree add --detach "$publish_dir" "refs/remotes/origin/${branch}"
+            git -C "$publish_dir" config user.name "github-actions[bot]"
+            git -C "$publish_dir" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git -C "$publish_dir" rm -r --ignore-unmatch --quiet schedule-data
+            mkdir -p "$publish_dir/schedule-data"
+            cp -a "$imported_data"/. "$publish_dir/schedule-data/"
+            git -C "$publish_dir" add -- schedule-data/
+
+            if git -C "$publish_dir" diff --cached --quiet; then
+              echo "No schedule dataset changes to publish"
+              git worktree remove "$publish_dir"
+              exit 0
+            fi
+
+            git -C "$publish_dir" commit -m "Update published university schedule datasets"
+            if git -C "$publish_dir" push origin "HEAD:${GITHUB_REF}"; then
+              git worktree remove "$publish_dir"
+              exit 0
+            fi
+            git worktree remove "$publish_dir"
+            if [[ "$attempt" -eq 3 ]]; then
+              echo "::error::Could not publish schedule data after three attempts."
+              exit 1
+            fi
+            echo "Push was rejected because the branch advanced; rebuilding the publish commit on the latest ${branch} (attempt $((attempt + 1))/3)."
+          done
+
+      - name: Deploy published datasets to GitHub Pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          branch="${GITHUB_REF#refs/heads/}"
+          gh workflow run deploy-pages.yml --repo "$GITHUB_REPOSITORY" --ref "$branch"

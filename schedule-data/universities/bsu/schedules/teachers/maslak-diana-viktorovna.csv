@@ -1,0 +1,4 @@
+date,start_time,end_time,subject,teacher,classroom,type,slot_number,source_key
+2026-10-29,15:35,17:00,Информационный час,Маслак Диана Викторовна,312 · Курчатова 5,unknown,5,maslak-diana-viktorovna|2026-10-29|5|15:35-17:00|bio:63:0
+2026-10-30,14:00,15:25,Генетика · подгруппа 2,Маслак Диана Викторовна,312 · Курчатова 5,laboratory,4,maslak-diana-viktorovna|2026-10-30|4|14:00-15:25|bio:41:1
+2026-10-30,15:35,17:00,Генетика · подгруппа 2,Маслак Диана Викторовна,312 · Курчатова 5,laboratory,5,maslak-diana-viktorovna|2026-10-30|5|15:35-17:00|bio:61:1

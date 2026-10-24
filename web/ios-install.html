@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#F4F6FA">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Schedule">
+  <meta name="description" content="Инструкция по установке веб-приложения Schedule на iPhone и iPad.">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="preload" href="./fonts/RobotoVariable.ttf" as="font" type="font/ttf" crossorigin="anonymous">
+  <link rel="stylesheet" href="./styles.css">
+  <title>Установка на iPhone и iPad · Schedule</title>
+</head>
+<body>
+  <div id="app" class="theme-white">
+    <div class="app-shell">
+      <main class="page-content">
+        <header class="brand-row">
+          <svg class="brand-glyph" viewBox="0 0 44 44" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M14 3v9M30 3v9"/><rect x="5" y="7" width="34" height="30" rx="5"/><path d="M5 17h34"/>
+            <g fill="currentColor" stroke="none"><rect x="12.45" y="21" width="3.2" height="3.2" rx="1"/><rect x="17.75" y="21" width="3.2" height="3.2" rx="1"/><rect x="23.05" y="21" width="3.2" height="3.2" rx="1" fill="var(--cyan)"/><rect x="28.35" y="21" width="3.2" height="3.2" rx="1"/><rect x="12.45" y="28" width="3.2" height="3.2" rx="1"/><rect x="17.75" y="28" width="3.2" height="3.2" rx="1"/><rect x="23.05" y="28" width="3.2" height="3.2" rx="1"/><rect x="28.35" y="28" width="3.2" height="3.2" rx="1"/></g>
+          </svg>
+          <div class="brand-copy"><p class="brand-title">Schedule</p><p class="brand-quote">Установка на iPhone и iPad</p></div>
+        </header>
+        <div class="page-heading">
+          <p class="eyebrow">IPHONE · IPAD</p>
+          <h1>Добавьте на экран «Домой»</h1>
+          <p>Веб-версия открывается в Safari и устанавливается как приложение. App Store не нужен.</p>
+        </div>
+        <section class="settings-card">
+          <ol class="install-steps">
+            <li>Откройте <a href="./">«Schedule»</a> в <strong>Safari</strong>. Если страница открылась внутри Telegram или другого приложения, выберите «Открыть в Safari».</li>
+            <li>Нажмите <strong>«Поделиться»</strong> — квадрат со стрелкой вверх в панели Safari.</li>
+            <li>Прокрутите меню вверх и выберите <strong>«На экран Домой»</strong>. Если пункта не видно, откройте «Изменить действия» и добавьте его.</li>
+            <li>При желании включите <strong>«Открывать как веб-приложение»</strong>, затем нажмите <strong>«Добавить»</strong>.</li>
+            <li>Запустите приложение с нового значка. Подключитесь к интернету, чтобы добавить профиль и загрузить расписание.</li>
+          </ol>
+          <div class="notice-card" style="margin-top:14px"><span class="notice-icon">◉</span><div class="notice-copy"><strong>Офлайн-режим</strong><p>Расписание и дедлайны сохраняются на устройстве. Для добавления и обновления расписания потребуется интернет.</p></div></div>
+          <div class="button-row" style="margin-top:12px"><a class="primary-button" href="./">Открыть приложение</a></div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <style>
+    .install-steps { margin: 0; padding-left: 22px; color: var(--muted); font-size: calc(10px * var(--scale-body)); line-height: 1.65; }
+    .install-steps li { padding-left: 4px; margin: 0 0 12px; }
+    .install-steps li:last-child { margin-bottom: 0; }
+    .install-steps strong { color: var(--text); }
+  </style>
+</body>
+</html>
